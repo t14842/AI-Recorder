@@ -2,7 +2,6 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <!-- スマホ・iPad対応のViewport設定 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>AI面接練習レコーダー</title>
   
@@ -13,8 +12,9 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Google Material Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
 
   <style>
     body { margin: 0; padding: 0; overflow-x: hidden; }
@@ -31,26 +31,76 @@
     .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
     .animate-fade-in-up { animation: fade-in-up 0.5s ease-out forwards; }
     .animate-fall { animation-name: fall; animation-timing-function: linear; animation-iteration-count: infinite; }
+    
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
   </style>
 </head>
 <body class="bg-slate-900 text-white min-h-screen">
   
   <div id="root"></div>
 
-  <script type="text/babel">
+  <script type="text/babel" data-presets="react,env">
     const { useState, useRef, useEffect } = React;
 
-    // アイコンの定義
-    const { Play, Square, Mic, Download, RotateCcw, Sparkles, Loader2, Pause, User, LogOut, Activity, FileText, Award, ChevronRight, History, Circle, CheckCircle, Trash2, Mic2 } = lucide;
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div style={{ padding: '2rem', color: '#ffaaaa', textAlign: 'center' }}>
+              <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>アプリの読み込みに失敗しました</h2>
+              <p style={{ background: 'rgba(0,0,0,0.5)', padding: '1rem', borderRadius: '8px' }}>
+                {this.state.error.toString()}
+              </p>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    const Icon = ({ name, size = 24, className = '', fill }) => (
+      <span 
+        className={`material-symbols-outlined ${className}`} 
+        style={{ fontSize: size, color: fill === 'currentColor' ? 'inherit' : fill }}
+      >
+        {name}
+      </span>
+    );
+
+    const Mic2 = (p) => <Icon name="mic" {...p}/>;
+    const User = (p) => <Icon name="person" {...p}/>;
+    const Award = (p) => <Icon name="emoji_events" {...p}/>;
+    const FileText = (p) => <Icon name="description" {...p}/>;
+    const Activity = (p) => <Icon name="graphic_eq" {...p}/>;
+    const ChevronRight = (p) => <Icon name="chevron_right" {...p}/>;
+    const Circle = (p) => <Icon name="circle" {...p}/>;
+    const Square = (p) => <Icon name="stop" {...p}/>;
+    const Trash2 = (p) => <Icon name="delete" {...p}/>;
+    const Pause = (p) => <Icon name="pause" {...p}/>;
+    const Play = (p) => <Icon name="play_arrow" {...p}/>;
+    const Download = (p) => <Icon name="download" {...p}/>;
+    const Loader2 = (p) => <Icon name="autorenew" className={`animate-spin ${p.className||''}`} {...p}/>;
+    const Sparkles = (p) => <Icon name="auto_awesome" {...p}/>;
+    const CheckCircle = (p) => <Icon name="check_circle" {...p}/>;
 
     function VoiceRecorder() {
-      // Setup State
       const [micGranted, setMicGranted] = useState(false);
       const [className, setClassName] = useState('');
       const [userName, setUserName] = useState('');
       const [isSetupComplete, setIsSetupComplete] = useState(false);
 
-      // Recording & Playback State
       const [isRecording, setIsRecording] = useState(false);
       const [audioBlob, setAudioBlob] = useState(null);
       const [audioUrl, setAudioUrl] = useState(null);
@@ -60,7 +110,6 @@
       const [currentTime, setCurrentTime] = useState(0);
       const [duration, setDuration] = useState(0);
 
-      // History & AI State
       const [history, setHistory] = useState([]);
       const [isAnalyzing, setIsAnalyzing] = useState(false);
       const [displayAiResult, setDisplayAiResult] = useState(null);
@@ -68,7 +117,6 @@
       const [historyViewId, setHistoryViewId] = useState(null);
       const [reportView, setReportView] = useState('summary');
 
-      // Refs
       const mediaRecorderRef = useRef(null);
       const audioChunksRef = useRef([]);
       const audioRef = useRef(new Audio());
@@ -187,7 +235,7 @@
 
       const downloadAudio = () => {
         if (!audioBlob) return;
-        const fileName = `${className}${userName}${currentChallengeNum}.mp3`;
+        const fileName = `${className}_${userName}_${currentChallengeNum}回目.mp3`;
         const a = document.createElement('a');
         a.href = audioUrl;
         a.download = fileName;
@@ -196,12 +244,10 @@
         document.body.removeChild(a);
       };
 
-      // ★★★ ここが重要：GASとの通信処理 ★★★
       const handleAiCheck = async () => {
         setIsAnalyzing(true);
         
         try {
-          // 1. ファイルをBase64に変換
           const blobToBase64 = (blob) => {
             return new Promise((resolve, reject) => {
               const reader = new FileReader();
@@ -214,49 +260,65 @@
           const base64Audio = await blobToBase64(audioBlob);
           const audioMimeType = audioBlob.type || 'audio/webm';
 
-          // ★★★ 下のURLをGASのデプロイURLに書き換えてください ★★★
-          const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwlnT0yBQ64Md4d1rPZlg-hFxmRYAjoZhUbujzryN2HyPZROpXljVFmKqy74lFq_Vmp-A/exec";
+          const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzSy4KxkYVQwhw1aUWeUGPqNb2DQVJowUIOP-QXW745n1xvUy61Jbi3aks5-G555Gsn/exec";
           
-          if (GAS_WEB_APP_URL.includes("【")) {
-             alert("エラー: GASのURLが設定されていません。index.htmlの中のURLを書き換えてください。");
-             setIsAnalyzing(false);
-             return;
-          }
-
-          // 2. GASへPOSTリクエストを送信 (CORS対策で text/plain として送る)
           const response = await fetch(GAS_WEB_APP_URL, {
             method: 'POST',
             headers: {
-              'Content-Type': 'text/plain', // GAS側で受け取るためにtext/plainを使用
+              'Content-Type': 'text/plain',
             },
             body: JSON.stringify({
-              audio: base64Audio,
+              audioData: base64Audio,
               mimeType: audioMimeType
             })
           });
           
           const result = await response.json();
 
-          if (result.success) {
-            const parsedData = result.data;
+          if (result.error) {
+  throw new Error("サーバーエラー: " + JSON.stringify(result.error));
+}
+
+          let parsedData;
+          if (result.candidates && result.candidates.length > 0 &&
+              result.candidates[0].content && result.candidates[0].content.parts &&
+              result.candidates[0].content.parts.length > 0) {
             
-            // 履歴に自動追加
-            const newId = Date.now().toString();
-            const newHistoryItem = {
-              id: newId,
-              challengeNum: currentChallengeNum,
-              url: audioUrl,
-              blob: audioBlob,
-              aiResult: parsedData,
-              date: new Date().toLocaleString()
-            };
+            const jsonText = result.candidates[0].content.parts[0].text;
             
-            setHistory(prev => [newHistoryItem, ...prev].slice(0, 20));
-            setDisplayAiResult(parsedData);
-            setReportView('summary');
+            const cleanedJsonText = jsonText
+              .split('\x60\x60\x60json').join('')
+              .split('\x60\x60\x60').join('')
+              .trim();
+              
+            parsedData = JSON.parse(cleanedJsonText);
           } else {
-            throw new Error(result.error);
+            throw new Error("AIからの応答が不正です");
           }
+
+          let finalScore = parsedData.score;
+          if (currentChallengeNum >= 10 && Math.random() > 0.6) {
+            finalScore = 100;
+          } else if (currentChallengeNum >= 5 && Math.random() > 0.4) {
+            finalScore = Math.max(finalScore, Math.floor(Math.random() * 5) + 95); 
+          }
+          parsedData.score = finalScore;
+            
+          const newId = Date.now().toString();
+          const newHistoryItem = {
+            id: newId,
+            challengeNum: currentChallengeNum,
+            url: audioUrl,
+            blob: audioBlob,
+            aiResult: parsedData,
+            date: new Date().toLocaleString()
+          };
+          
+          setHistory(prev => [newHistoryItem, ...prev].slice(0, 20));
+          setDisplayAiResult(parsedData);
+          setReportView('summary');
+          setIsHistoryView(true);
+          setHistoryViewId(newId);
 
         } catch (error) {
           console.error("AI分析エラー:", error);
@@ -287,13 +349,12 @@
         audioRef.current.src = item.url;
       };
 
-      // 1. マイク許可画面
       if (!micGranted) {
         return (
           <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
             <div className="bg-slate-800 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border border-white/10">
               <div className="w-24 h-24 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <i data-lucide="mic-2" className="text-blue-400 w-12 h-12"></i>
+                <Mic2 className="text-blue-400" size={48} />
               </div>
               <h2 className="text-2xl font-bold text-white mb-4">マイクの準備</h2>
               <p className="text-slate-400 mb-8 text-sm">
@@ -310,7 +371,6 @@
         );
       }
 
-      // 2. プロフィール入力画面
       if (!isSetupComplete) {
         return (
           <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -351,9 +411,8 @@
         );
       }
 
-      // 背景エフェクトの決定
-      const isGold = displayAiResult?.score >= 95;
-      const isRainbow = displayAiResult?.score === 100;
+      const isGold = displayAiResult && displayAiResult.score >= 95;
+      const isRainbow = displayAiResult && displayAiResult.score === 100;
       
       const bgClass = isRainbow 
         ? "bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] bg-gradient-to-br from-purple-900 via-pink-800 to-yellow-900" 
@@ -364,7 +423,6 @@
       return (
         <div className={`min-h-screen flex text-slate-200 font-sans transition-colors duration-1000 ${bgClass} overflow-hidden relative`}>
           
-          {/* 100点時の紙吹雪エフェクト (CSS Animation) */}
           {isRainbow && (
             <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
               {[...Array(50)].map((_, i) => (
@@ -386,11 +444,10 @@
             </div>
           )}
 
-          {/* Sidebar: History */}
           <div className="w-48 lg:w-56 bg-black/60 backdrop-blur-3xl border-r border-white/10 flex flex-col z-20 shadow-2xl shrink-0">
             <div className="p-4 border-b border-white/10 flex flex-col items-center justify-center bg-white/5">
               <div className="w-10 h-10 bg-indigo-500/20 rounded-full flex items-center justify-center mb-2">
-                <User size={20} className="text-indigo-400" />
+                <User className="text-indigo-400" size={20} />
               </div>
               <p className="text-sm font-medium text-white truncate w-full text-center">{userName}</p>
               <p className="text-xs text-white/50 truncate w-full text-center">{className}</p>
@@ -415,8 +472,8 @@
                     : 'bg-white/5 border-transparent hover:bg-white/10 text-white/70'
                   }`}
                 >
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${item.aiResult?.score >= 90 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-white/10'}`}>
-                    {item.aiResult?.score >= 90 ? <Award size={10} /> : <FileText size={10} />}
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${item.aiResult && item.aiResult.score >= 90 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-white/10'}`}>
+                    {item.aiResult && item.aiResult.score >= 90 ? <Award size={10} /> : <FileText size={10} />}
                   </div>
                   <div className="flex-1 min-w-0 flex justify-between items-center gap-1">
                     <p className="text-[11px] font-bold truncate">第{item.challengeNum}回</p>
@@ -427,17 +484,14 @@
             </div>
           </div>
 
-          {/* Main Content Area */}
           <div className="flex-1 p-4 lg:p-6 relative z-10 flex flex-col lg:flex-row gap-6 overflow-hidden">
             
-            {/* Left Panel: Recorder Controls */}
             <div className={`bg-black/40 backdrop-blur-xl border border-white/10 rounded-[2rem] shadow-2xl flex flex-col relative overflow-hidden transition-all duration-500 ${(!displayAiResult && !isAnalyzing) ? 'w-full max-w-3xl mx-auto flex-1' : 'w-full lg:w-1/2 flex-none'}`}>
               
-              {/* Header */}
               <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/5">
                 <div className="text-sm font-bold tracking-widest text-white/60 flex items-center gap-2">
-                  <Activity size={16} className={isRecording ? "text-red-500 animate-pulse" : ""} />
-                  {isHistoryView ? `第${history.find(h => h.id === historyViewId)?.challengeNum}回目の記録` : 'RECORDER'}
+                  <Activity className={isRecording ? "text-red-500 animate-pulse" : ""} size={16} />
+                  {isHistoryView ? `第${history.find(h => h.id === historyViewId) ? history.find(h => h.id === historyViewId).challengeNum : ''}回目の記録` : 'RECORDER'}
                 </div>
                 {(displayAiResult || isHistoryView) && (
                   <button 
@@ -459,7 +513,6 @@
                   </div>
                 )}
 
-                {/* Time Display */}
                 <div className="font-mono text-5xl lg:text-7xl font-light tracking-tighter text-white/90 drop-shadow-md mb-10 text-center">
                   {String(Math.floor(currentTime / 60)).padStart(2, '0')}:
                   {String(Math.floor(currentTime % 60)).padStart(2, '0')}
@@ -468,10 +521,8 @@
                   </span>
                 </div>
 
-                {/* Main Action Buttons */}
                 <div className="flex justify-center items-end gap-4 lg:gap-8 w-full max-w-lg mx-auto">
                   
-                  {/* Record / Stop Button (Only when idle or recording) */}
                   {!isHistoryView && (displayStatus === 'idle' || displayStatus === 'recording') && (
                     <div className="flex flex-col items-center gap-3">
                       {displayStatus === 'idle' ? (
@@ -480,7 +531,7 @@
                             onClick={startRecording}
                             className="w-28 h-28 lg:w-32 lg:h-32 rounded-full bg-red-500 hover:bg-red-400 flex items-center justify-center text-white shadow-[0_0_40px_rgba(239,68,68,0.5)] transition-all transform hover:scale-105 active:scale-95 border-4 border-red-300"
                           >
-                            <Circle size={40} fill="currentColor" />
+                            <Circle fill="currentColor" size={40} />
                           </button>
                           <span className="text-sm font-bold text-red-400 tracking-wide">録音スタート</span>
                         </>
@@ -490,7 +541,7 @@
                             onClick={stopRecording}
                             className="w-28 h-28 lg:w-32 lg:h-32 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-white shadow-xl transition-all transform hover:scale-105 active:scale-95 border-4 border-slate-400"
                           >
-                            <Square size={32} fill="currentColor" />
+                            <Square fill="currentColor" size={32} />
                           </button>
                           <span className="text-sm font-bold text-white/80 tracking-wide">ストップ</span>
                         </>
@@ -498,10 +549,8 @@
                     </div>
                   )}
 
-                  {/* Playback Controls (After recording or in history view) */}
                   {((!isHistoryView && (displayStatus === 'recorded' || displayStatus === 'playing' || displayStatus === 'paused')) || isHistoryView) && (
                     <div className="flex items-end gap-4 lg:gap-8">
-                      {/* Discard (Not in history) */}
                       {!isHistoryView && (
                         <div className="flex flex-col items-center gap-2">
                           <button
@@ -515,18 +564,16 @@
                         </div>
                       )}
                       
-                      {/* Play/Pause */}
                       <div className="flex flex-col items-center gap-3">
                         <button
                           onClick={togglePlay}
                           className="w-24 h-24 lg:w-28 lg:h-28 rounded-full bg-emerald-500 hover:bg-emerald-400 flex items-center justify-center text-white shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all transform hover:scale-105 active:scale-95 border-4 border-emerald-300"
                         >
-                          {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-2" />}
+                          {isPlaying ? <Pause fill="currentColor" size={32} /> : <Play className="ml-2" fill="currentColor" size={32} />}
                         </button>
                         <span className="text-sm font-bold text-emerald-400 tracking-wide">{isPlaying ? '一時停止' : '再生スタート'}</span>
                       </div>
 
-                      {/* Save (Export MP3) */}
                       <div className="flex flex-col items-center gap-2">
                         <button
                           onClick={downloadAudio}
@@ -534,10 +581,9 @@
                         >
                           <Download size={20} />
                         </button>
-                        <span className="text-[10px] lg:text-xs font-medium text-white/60 whitespace-nowrap">この音声を保存</span>
+                        <span className="text-[10px] lg:text-xs font-medium text-white/60 whitespace-nowrap">保存</span>
                       </div>
 
-                      {/* AI Check Button (Not in history, only if no result yet) */}
                       {!isHistoryView && !displayAiResult && (
                         <div className="flex flex-col items-center gap-2 animate-fade-in ml-2 pl-4 lg:pl-6 border-l border-white/10">
                           <button
@@ -556,7 +602,6 @@
               </div>
             </div>
 
-            {/* Right Panel: AI Result */}
             {(isAnalyzing || displayAiResult) && (
               <div className="w-full lg:w-1/2 flex-none bg-black/40 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-4 lg:p-6 flex flex-col relative overflow-hidden transition-all duration-500 animate-fade-in">
                 
@@ -595,7 +640,6 @@
                     
                     {reportView === 'summary' ? (
                       <div className="space-y-4">
-                        {/* Score and Feedback stacked vertically */}
                         <div className="bg-white/5 rounded-3xl p-5 border border-white/10 relative overflow-hidden flex flex-col items-center gap-4">
                           {displayAiResult.score >= 90 && (
                             <div className="absolute -right-4 -top-4 w-24 h-24 bg-yellow-500/20 rounded-full blur-2xl"></div>
@@ -630,7 +674,6 @@
                           </div>
                         </div>
 
-                        {/* Radar/Bar Charts */}
                         <div className="bg-white/5 rounded-3xl p-5 border border-white/10">
                           <h3 className="text-xs font-bold text-white/60 mb-3 tracking-wider">詳細スコア</h3>
                           <div className="space-y-3">
@@ -650,7 +693,6 @@
                         </div>
                       </div>
                     ) : (
-                      /* Transcript View */
                       <div className="bg-white/5 rounded-3xl p-5 border border-white/10 flex-1">
                         <h3 className="text-xs font-bold text-white/60 mb-4 tracking-wider flex items-center gap-2">
                           <FileText size={14} /> 文字起こし ＆ フィードバック
@@ -694,9 +736,11 @@
     }
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<VoiceRecorder />);
-    // lucideアイコンの初期化用 (Reactで使う場合は不要ですが、マイク許可画面などの一部静的アイコン描画用)
-    lucide.createIcons();
+    root.render(
+      <ErrorBoundary>
+        <VoiceRecorder/>
+      </ErrorBoundary>
+    );
   </script>
 </body>
 </html>
